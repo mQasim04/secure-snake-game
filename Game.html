@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure Snake Game</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+<!-- AUTH -->
+<div id="auth-view">
+  <div class="card">
+    <h1>Snake Game</h1>
+    <p class="sub">Login to play. Your scores are encrypted and saved securely.</p>
+    <div id="auth-msg" class="msg"></div>
+    <div class="tab-row">
+      <button class="tab on" id="tl" onclick="showTab('l')">Login</button>
+      <button class="tab" id="tr" onclick="showTab('r')">Register</button>
+    </div>
+
+    <div id="pane-l">
+      <label>Username</label>
+      <input type="text" id="lu" placeholder="username" autocomplete="off">
+      <label>Password</label>
+      <input type="password" id="lp" placeholder="password">
+      <div id="rate-msg" class="msg warn"></div>
+      <button class="bp" onclick="doLogin()">Login</button>
+      <p style="text-align:center;font-size:13px;color:var(--color-text-secondary,#666)">No account? <button class="lnk" onclick="showTab('r')">Register here</button></p>
+    </div>
+
+    <div id="pane-r" style="display:none">
+      <label>Username</label>
+      <input type="text" id="ru" placeholder="choose username" autocomplete="off">
+      <label>Password</label>
+      <input type="password" id="rp" placeholder="min 8 chars, include number &amp; symbol" oninput="pwBar(this.value)">
+      <div class="pw-bar"><div class="pw-fill" id="pwf"></div></div>
+      <label>Confirm password</label>
+      <input type="password" id="rp2" placeholder="repeat password">
+      <button class="bp" onclick="doRegister()">Create account</button>
+      <p style="text-align:center;font-size:13px;color:var(--color-text-secondary,#666)">Have account? <button class="lnk" onclick="showTab('l')">Login</button></p>
+    </div>
+
+    <div class="badges">
+      <span class="badge">SHA-256 passwords</span>
+      <span class="badge">AES-256 save file</span>
+      <span class="badge">RSA-2048 key wrap</span>
+      <span class="badge">PBKDF2 key protect</span>
+      <span class="badge">Integrity check</span>
+      <span class="badge">Session timeout</span>
+    </div>
+  </div>
+
+  <!-- Storage info shown on auth screen -->
+  <div class="card">
+    <p style="font-size:14px;font-weight:500;margin-bottom:10px;">Where is data stored?</p>
+    <div class="store-info">
+      All data is stored in your browser's <strong>localStorage</strong> — nothing is sent to any server.
+      Passwords are stored as a <strong>salted SHA-256 hash</strong> (never plain text).
+      Your score file is <strong>AES-256 encrypted</strong> and only decrypted after successful login.
+      The AES key is wrapped with <strong>RSA-2048</strong> and your RSA private key is protected via <strong>PBKDF2</strong>.
+    </div>
+    <p style="font-size:12px;color:var(--color-text-secondary,#666);">Storage key prefix: <code style="font-size:12px;background:rgba(0,0,0,0.05);padding:2px 5px;border-radius:4px;">sg_u_&lt;username&gt;</code> in localStorage.</p>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game-view">
+  <div class="card">
+    <div class="top-bar">
+      <div>
+        <div class="uname" id="g-user">Player</div>
+        <div class="sess"><span class="dot"></span><span id="g-sess">Session active</span></div>
+      </div>
+      <button class="bsm bd" onclick="doLogout()">Save &amp; logout</button>
+    </div>
+
+    <div class="gnav">
+      <button class="gtab on" id="gt-play" onclick="gTab('play')">Play</button>
+      <button class="gtab" id="gt-scores" onclick="gTab('scores')">My Scores</button>
+      <button class="gtab" id="gt-settings" onclick="gTab('settings')">Settings</button>
+      <button class="gtab" id="gt-storage" onclick="gTab('storage')">Storage</button>
+    </div>
+
+    <!-- PLAY TAB -->
+    <div id="gt-play-pane">
+      <div id="save-msg" class="msg"></div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="g-score">0</div><div class="l">Score</div></div>
+        <div class="stat"><div class="n" id="g-best">0</div><div class="l">Best ever</div></div>
+        <div class="stat"><div class="n" id="g-level">1</div><div class="l">Level</div></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="cv"></canvas>
+        <div class="paused-overlay" id="pause-overlay">
+          <div class="paused-text">Paused</div>
+          <div class="paused-sub">Press P or click Resume</div>
+        </div>
+      </div>
+      <div class="game-btns" style="margin-top:10px;">
+        <button class="bp" onclick="startGame()" id="btn-start">Start</button>
+        <button onclick="togglePause()" id="btn-pause" disabled>Pause</button>
+        <button class="bs bsm" style="flex:none;padding:9px 14px;" onclick="saveGame()">Save</button>
+      </div>
+      <p class="hint">Arrow keys / WASD to move &nbsp;·&nbsp; P to pause &nbsp;·&nbsp; Space to start</p>
+    </div>
+
+    <!-- SCORES TAB -->
+    <div id="gt-scores-pane" style="display:none">
+      <div id="scores-content"></div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div id="gt-settings-pane" style="display:none">
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Snake speed</div>
+          <div class="setting-sub">Controls how fast the snake moves</div>
+        </div>
+        <div class="setting-ctrl">
+          <input type="range" min="1" max="5" step="1" value="3" id="speed-slider" oninput="onSpeedChange(this.value)" style="width:90px;">
+          <span class="speed-val" id="speed-label">Normal</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Auto-save on game over</div>
+          <div class="setting-sub">Encrypts and saves when you die</div>
+        </div>
+        <div class="setting-ctrl" style="justify-content:flex-end;">
+          <input type="checkbox" id="auto-save" checked style="width:18px;height:18px;accent-color:#185FA5;cursor:pointer;">
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Session timeout</div>
+          <div class="setting-sub">Auto-logout after inactivity</div>
+        </div>
+        <div class="setting-ctrl" style="justify-content:flex-end;">
+          <span style="font-size:14px;font-weight:500;">10 min</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORAGE TAB -->
+    <div id="gt-storage-pane" style="display:none">
+      <div class="store-info" style="margin-bottom:12px;">
+        <strong>Where passwords are stored:</strong><br>
+        Your password is <em>never</em> stored. Only a <strong>salted SHA-256 hash</strong> is saved. Even if someone reads localStorage, they cannot recover your password.
+      </div>
+      <div class="store-info" style="margin-bottom:12px;">
+        <strong>Where scores are stored:</strong><br>
+        Scores are stored inside an <strong>AES-256-GCM encrypted blob</strong> in localStorage. They are unreadable without your password. The key to decrypt is wrapped with <strong>RSA-2048</strong>, and the RSA private key itself is protected by <strong>PBKDF2</strong>.
+      </div>
+      <div class="store-info" style="margin-bottom:12px;">
+        <strong>Integrity:</strong><br>
+        A <strong>SHA-256 hash</strong> of the encrypted save file is stored. On login, it is recomputed and compared — any tampering is detected.
+      </div>
+      <div id="raw-storage-display" style="margin-top:4px;"></div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+<script src="logic.js"></script>
+
+</body>
+</html>
